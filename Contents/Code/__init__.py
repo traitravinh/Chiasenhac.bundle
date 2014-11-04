@@ -86,21 +86,13 @@ def Index_search(title, indexlink):
             if info == None:
                 info = BeautifulSoup(str(gen[index]))('span')[0].next.next.next
             ttitle = '[' + info + '] - ' + ttitle.encode('utf8') + ' - ' + tartist.encode('utf-8')
-
-            if ttitle.find('Lossless')!=-1 or ttitle.find('kbps]')!=-1:
-                oc.add(DirectoryObject(
-                    key=Callback(Media, metitle=ttitle, melink=tlink, methumb=R(DEFAULT_ICO)),
-                    title=ttitle,
-                    thumb=R(DEFAULT_ICO)
-                ))
-            else:
-                oc.add(createMediaObject(
-                    url=tlink,
-                    title=ttitle,
-                    thumb=R(DEFAULT_ICO),
-                    art=R(ART),
-                    rating_key=ttitle
-                ))
+            oc.add(createMediaObject(
+                url=tlink,
+                title=ttitle,
+                thumb=R(DEFAULT_ICO),
+                art=R(ART),
+                rating_key=ttitle
+            ))
 
         except:
             pass
@@ -146,7 +138,6 @@ def Category(title, catelink):
             if len(info) > 0:
                 infotext = info[0].text
                 gtitle = '[' + infotext + '] - ' + gtitle
-
             oc.add(createMediaObject(
                 url=glink,
                 title=gtitle,
@@ -232,85 +223,68 @@ def Category(title, catelink):
 
     return oc
 
-
 ####################################################################################################
-
-@route('/video/chiasenhac/media')
-def Media(metitle, melink, methumb):
-    Log(metitle)
-    oc = ObjectContainer(title2=metitle)
-    melink = medialink(melink)
-
-    oc.add(CreateTrackObject(
-        url=melink,
-        title=metitle,
-        thumb=methumb,
-        art=R(ART),
-        rating_key=metitle
-    ))
-    return oc
-
-@route('/video/chiasenhac/CreateTrackObject')
-def CreateTrackObject(url, title, thumb, art, rating_key, include_container=False):
-    container = 'mp3'
-    audio_codec = AudioCodec.AAC
-    audio_channels = 2
-    track_object = TrackObject(
-        key=Callback(CreateTrackObject, url=url, title=title, thumb=thumb, art=art, rating_key=rating_key, include_container=True),
-        title=title,
-        thumb=thumb,
-        art=art,
-        rating_key=rating_key,
-        items=[
-            MediaObject(
-                parts=[
-                    PartObject(key=url)
-                ],
-                container=container,
-                audio_codec=audio_codec,
-                audio_channels=audio_channels,
-                optimized_for_streaming=True
-            )]
-    )
-    if include_container:
-        return ObjectContainer(objects=[track_object])
-    else:
-        return track_object
 
 @route('/video/chiasenhac/createMediaObject')
 def createMediaObject(url, title, thumb, art, rating_key, include_container=False):
-    container = Container.MP4
-    video_codec = VideoCodec.H264
-    audio_codec = AudioCodec.AAC
-    audio_channels = 2
-    track_object = EpisodeObject(
-        key=Callback(
-            createMediaObject,
-            url=url,
+    Log(url)
+    if str(url).find('/video/') == -1:
+        Log('Play Audio: - '+title)
+        container = 'mp3'
+        audio_codec = AudioCodec.MP3
+        audio_channels = 2
+        track_object = TrackObject(
+            key=Callback(createMediaObject, url=url, title=title, thumb=thumb, art=art, rating_key=rating_key, include_container=True),
             title=title,
             thumb=thumb,
             art=art,
             rating_key=rating_key,
-            include_container=True
-        ),
-        title=title,
-        thumb=thumb,
-        art=art,
-        rating_key=rating_key,
-        items=[
-            MediaObject(
-                parts=[
-                    PartObject(key=Callback(PlayVideo, url=url))
-                ],
-                container=container,
-                video_resolution='720',
-                video_codec=video_codec,
-                audio_codec=audio_codec,
-                audio_channels=audio_channels,
-                optimized_for_streaming=True
-            )
-        ]
-    )
+            items=[
+                MediaObject(
+                    parts=[
+                        PartObject(key=Callback(PlayVideo, url=url))
+                        # PartObject(key=url)
+                    ],
+                    container=container,
+                    audio_codec=audio_codec,
+                    audio_channels=audio_channels,
+                    optimized_for_streaming=True
+                )]
+        )
+    else:
+        Log('Play Video - '+title)
+        container = Container.MP4
+        video_codec = VideoCodec.H264
+        audio_codec = AudioCodec.AAC
+        audio_channels = 2
+        track_object = EpisodeObject(
+            key=Callback(
+                createMediaObject,
+                url=url,
+                title=title,
+                thumb=thumb,
+                art=art,
+                rating_key=rating_key,
+                include_container=True
+            ),
+            title=title,
+            thumb=thumb,
+            art=art,
+            rating_key=rating_key,
+            items=[
+                MediaObject(
+                    parts=[
+                        PartObject(key=Callback(PlayVideo, url=url))
+                    ],
+                    container=container,
+                    video_resolution='720',
+                    video_codec=video_codec,
+                    audio_codec=audio_codec,
+                    audio_channels=audio_channels,
+                    optimized_for_streaming=True
+                )
+            ]
+        )
 
     if include_container:
         return ObjectContainer(objects=[track_object])
@@ -321,14 +295,13 @@ def createMediaObject(url, title, thumb, art, rating_key, include_container=Fals
 @indirect
 def PlayVideo(url):
     url = medialink(url)
+    Log('File Link: '+url)
     return IndirectResponse(VideoClipObject, key=url)
-
 
 def medialink(url):
     link = HTTP.Request(url, cacheTime=3600).content
     newlink = ''.join(link.splitlines()).replace('\t', '')
     mlink = urllib2.unquote(re.compile('"file": decodeURIComponent\("(.+?)"\),').findall(newlink)[0])
-    Log(mlink)
     return mlink
 
 ####################################################################################################
