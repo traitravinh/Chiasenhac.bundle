@@ -20,20 +20,24 @@ RE_INDEX_SEARCH = Regex('<div class="m-left">(.+?)<div class="main-right">')
 def Start():
     ObjectContainer.title1 = NAME
     ObjectContainer.art = R(ART)
+
+    DirectoryObject.thumb = R(DEFAULT_ICO)
+    DirectoryObject.art = R(ART)
+
     HTTP.CacheTime = CACHE_1HOUR
     HTTP.Headers['User-Agent'] = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.8; rv:22.0) Gecko/20100101 Firefox/22.0'
     HTTP.Headers['X-Requested-With'] = 'XMLHttpRequest'
 
 
 ####################################################################################################
-@handler('/video/chiasenhac', NAME)
+@handler('/video/chiasenhac', NAME, art=ART, thumb=DEFAULT_ICO)
 def MainMenu():
     oc = ObjectContainer()
     oc.add(InputDirectoryObject(
         key=Callback(Search),
-        title='SEARCH',
-        thumb=R(SEARCH_ICO)
+        title='SEARCH'
     ))
+
     try:
         link = HTTP.Request(BASE_URL, cacheTime=3600).content
         newlink = ''.join(link.splitlines()).replace('\t', '')
@@ -226,31 +230,47 @@ def Category(title, catelink):
 ####################################################################################################
 
 @route('/video/chiasenhac/createMediaObject')
-def createMediaObject(url, title, thumb, art, rating_key, include_container=False):
-    Log(url)
-    if str(url).find('/video/') == -1:
+def createMediaObject(url, title, thumb, art, rating_key, include_container=False,includeRelatedCount=None,includeRelated=None,includeExtras=None):
+    if str(url).find('/video/') == -1: #and Client.Product and Client.Product in ('Plex Web', 'Web Client', 'Plex for Android', 'Plex Home Theater') :
         Log('Play Audio: - '+title)
-        container = 'mp3'
-        audio_codec = AudioCodec.MP3
-        audio_channels = 2
-        track_object = TrackObject(
-            key=Callback(createMediaObject, url=url, title=title, thumb=thumb, art=art, rating_key=rating_key, include_container=True),
-            title=title,
-            thumb=thumb,
-            art=art,
-            rating_key=rating_key,
-            items=[
-                MediaObject(
-                    parts=[
-                        PartObject(key=Callback(PlayVideo, url=url))
-                        # PartObject(key=url)
-                    ],
-                    container=container,
-                    audio_codec=audio_codec,
-                    audio_channels=audio_channels,
-                    optimized_for_streaming=True
-                )]
-        )
+        Log(url)
+        if Client.Product and Client.Product in ('Plex Web', 'Web Client', 'Plex Home Theater') :
+            container = 'mp3'
+            audio_codec = AudioCodec.MP3
+            audio_channels = 2
+            track_object = TrackObject(
+                key=Callback(createMediaObject, url=url, title=title, thumb=thumb, art=art, rating_key=rating_key, include_container=True),
+                title=title,
+                thumb=thumb,
+                art=art,
+                rating_key=rating_key,
+                items=[
+                    MediaObject(
+                        parts=[
+                            PartObject(key=Callback(PlayVideo, url=url))
+                            # PartObject(key=url)
+                        ],
+                        container=container,
+                        audio_codec=audio_codec,
+                        audio_channels=audio_channels,
+                        optimized_for_streaming=True
+                    )]
+            )
+
+        else:
+            media_obj = MediaObject(
+                audio_codec=AudioCodec.MP3,
+                container='mp3'
+            )
+            track_object = TrackObject(
+                key=Callback(createMediaObject, url=url, title=title, thumb=thumb, art=art, rating_key=rating_key, include_container=True),
+                rating_key=rating_key
+            )
+            track_object.title = title
+            track_object.thumb = thumb
+
+            media_obj.add(PartObject(key=Callback(PlayAudio, url=url)))
+            track_object.add(media_obj)
     else:
         Log('Play Video - '+title)
         container = Container.MP4
@@ -277,7 +297,6 @@ def createMediaObject(url, title, thumb, art, rating_key, include_container=Fals
                         PartObject(key=Callback(PlayVideo, url=url))
                     ],
                     container=container,
-                    video_resolution='720',
                     video_codec=video_codec,
                     audio_codec=audio_codec,
                     audio_channels=audio_channels,
@@ -291,6 +310,10 @@ def createMediaObject(url, title, thumb, art, rating_key, include_container=Fals
     else:
         return track_object
 
+@route('video/chiasenhac/playaudio')
+def PlayAudio(url):
+    url = medialink(url)
+    return Redirect(url)
 
 @indirect
 def PlayVideo(url):
